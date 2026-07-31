@@ -1,140 +1,105 @@
+import nodemailer from "nodemailer";
 import { siteConfig } from "@/constants/site";
 
-type AttachmentInput = {
-  filename: string;
-  content: Buffer | Uint8Array | string;
-  contentType?: string;
-};
-
-type SendMailInput = {
-  from?: string;
-  to: string | string[];
-  replyTo?: string;
-  subject: string;
-  text?: string;
-  html?: string;
-  attachments?: AttachmentInput[];
-};
-
-type ResendErrorBody = {
+type MailErrorShape = {
+  code?: string;
+  responseCode?: number;
+  response?: string;
+  command?: string;
   message?: string;
-  name?: string;
-  statusCode?: number;
 };
 
-const RESEND_ENDPOINT = "https://api.resend.com/emails";
-const DEFAULT_FROM = "Tech Fusion Website <website@send.mtechfusion.com>";
+function smtpConfig() {
+  const host = (process.env.SMTP_HOST || "smtp.hostinger.com").trim();
+  const port = Number(process.env.SMTP_PORT || "587");
+  const user = process.env.SMTP_USER?.trim();
+  const pass = process.env.SMTP_PASSWORD?.trim();
 
-function resendConfig() {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.RESEND_FROM_EMAIL?.trim() || DEFAULT_FROM;
+  if (!host || !user || !pass || !Number.isFinite(port)) {
+    return null;
+  }
 
-  if (!apiKey || !from) return null;
-  return { apiKey, from };
+  return { host, port, user, pass };
 }
 
 export function emailIsConfigured() {
-  return Boolean(resendConfig());
-}
-
-function encodeAttachment(content: AttachmentInput["content"]) {
-  if (typeof content === "string") return content;
-  return Buffer.from(content).toString("base64");
-}
-
-async function sendWithResend(input: SendMailInput) {
-  const config = resendConfig();
-  if (!config) throw new Error("EMAIL_NOT_CONFIGURED");
-
-  const response = await fetch(RESEND_ENDPOINT, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: input.from || config.from,
-      to: Array.isArray(input.to) ? input.to : [input.to],
-      reply_to: input.replyTo,
-      subject: input.subject,
-      text: input.text,
-      html: input.html,
-      attachments: input.attachments?.map((attachment) => ({
-        filename: attachment.filename,
-        content: encodeAttachment(attachment.content),
-      })),
-    }),
-  });
-
-  const body = (await response.json().catch(() => ({}))) as ResendErrorBody & {
-    id?: string;
-  };
-
-  if (!response.ok) {
-    const error = new Error(body.message || `Email API returned ${response.status}`) as Error & {
-      status?: number;
-      provider?: string;
-    };
-    error.status = response.status;
-    error.provider = body.name;
-    throw error;
-  }
-
-  return body;
+  return Boolean(smtpConfig());
 }
 
 export function createMailer() {
-  return {
-    sendMail: sendWithResend,
-  };
+  const config = smtpConfig();
+
+  if (!config) {
+    throw new Error("SMTP_NOT_CONFIGURED");
+  }
+
+  const secure = config.port === 465;
+
+  return nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure,
+    requireTLS: !secure,
+    authMethod: "LOGIN",
+    auth: {
+      user: config.user,
+      pass: config.pass,
+    },
+    connectionTimeout: 20_000,
+    greetingTimeout: 20_000,
+    socketTimeout: 35_000,
+    pool: false,
+    tls: {
+      servername: config.host,
+      minVersion: "TLSv1.2",
+      rejectUnauthorized: true,
+    },
+  });
 }
 
 export function senderAddress() {
-  return resendConfig()?.from || DEFAULT_FROM;
+  const user = process.env.SMTP_USER?.trim() || siteConfig.contactEmail;
+  return `Tech Fusion Website <${user}>`;
 }
 
 export function mailErrorMessage(error: unknown) {
-  const status =
-    typeof error === "object" && error !== null && "status" in error
-      ? Number((error as { status?: number }).status || 0)
-      : 0;
-  const message = error instanceof Error ? error.message.toLowerCase() : "";
-
-  if (error instanceof Error && error.message === "EMAIL_NOT_CONFIGURED") {
-    return "Website email delivery is not configured yet. Add RESEND_API_KEY in Vercel and redeploy.";
-  }
-
-  if (status === 401 || message.includes("api key")) {
-    return "The website email API key is invalid. Reconnect Resend in Vercel and redeploy.";
-  }
+  const details = (typeof error === "object" && error !== null ? error : {}) as MailErrorShape;
+  const code = String(details.code || "").toUpperCase();
+  const responseCode = Number(details.responseCode || 0);
+  const message = String(details.message || "").toLowerCase();
+  const response = String(details.response || "").toLowerCase();
 
   if (
-    status === 403 ||
-    message.includes("domain") ||
-    message.includes("verify") ||
-    message.includes("from address")
+    code === "EAUTH" ||
+    responseCode === 535 ||
+    message.includes("authentication") ||
+    response.includes("authentication") ||
+    response.includes("incorrect password") ||
+    response.includes("credentials")
   ) {
-    return "The website sending domain is not verified yet. Verify send.mtechfusion.com in Resend, then try again.";
+    return "Hostinger rejected the website email login. Check the info@mtechfusion.com mailbox password and confirm that mailbox sending is enabled in Hostinger.";
   }
 
-  if (status === 422) {
-    return "The email service rejected one of the submitted fields. Please check the form and try again.";
+  if (code === "ETIMEDOUT" || code === "ECONNECTION" || code === "ESOCKET") {
+    return "The website could not connect to Hostinger Email. Confirm SMTP_HOST is smtp.hostinger.com and SMTP_PORT is 587, then redeploy.";
   }
 
-  return "The website could not send this message right now. Please try again or contact us directly by email.";
+  if (error instanceof Error && error.message === "SMTP_NOT_CONFIGURED") {
+    return "Website email settings are incomplete. Add SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASSWORD in Vercel, then redeploy.";
+  }
+
+  return "Hostinger Email could not send this message right now. Please try again or contact Tech Fusion directly by email.";
 }
 
 export function logMailError(context: string, error: unknown) {
+  const details = (typeof error === "object" && error !== null ? error : {}) as MailErrorShape;
+
   console.error(`[Tech Fusion mail] ${context}`, {
-    message: error instanceof Error ? error.message : String(error),
-    status:
-      typeof error === "object" && error !== null && "status" in error
-        ? (error as { status?: number }).status
-        : undefined,
-    provider:
-      typeof error === "object" && error !== null && "provider" in error
-        ? (error as { provider?: string }).provider
-        : undefined,
+    code: details.code,
+    responseCode: details.responseCode,
+    command: details.command,
+    response: details.response,
+    message: details.message,
   });
 }
 
