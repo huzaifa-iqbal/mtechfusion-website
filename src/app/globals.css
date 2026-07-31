@@ -1,0 +1,415 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f7f4;
+  --surface: #ffffff;
+  --surface-soft: #f1f1ed;
+  --foreground: #111111;
+  --muted: #686868;
+  --yellow: #ffc400;
+  --gold: #d5a12b;
+  --gold-deep: #a97814;
+  --border: rgba(17, 17, 17, 0.075);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+header,
+main,
+footer,
+section,
+article,
+nav,
+aside,
+div {
+  min-width: 0;
+}
+
+section {
+  max-width: 100%;
+}
+
+img,
+svg,
+video,
+canvas,
+iframe {
+  display: block;
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-manrope), Arial, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: var(--yellow);
+  color: #111;
+}
+
+:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 3px;
+}
+
+/* =========================================================
+   LAYOUT
+========================================================= */
+
+.site-container {
+  width: min(1500px, calc(100% - 48px));
+  margin-inline: auto;
+}
+
+/* =========================================================
+   SAFE SECTION BACKGROUNDS
+   These are local section backgrounds only.
+   They do not change positioning or z-index.
+========================================================= */
+
+@keyframes tfBackgroundDrift {
+  0%,
+  100% {
+    background-position: 82% 10%, 6% 88%, 0 0, 0 0;
+  }
+
+  50% {
+    background-position: 76% 14%, 11% 82%, 26px 18px, 26px 18px;
+  }
+}
+
+.tf-tech-light {
+  background-color: #fdfdfb;
+  background-image:
+    radial-gradient(
+      circle at 82% 10%,
+      rgba(255, 196, 0, 0.11),
+      transparent 340px
+    ),
+    radial-gradient(
+      circle at 6% 88%,
+      rgba(213, 161, 43, 0.075),
+      transparent 360px
+    ),
+    linear-gradient(
+      rgba(190, 137, 29, 0.055) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(190, 137, 29, 0.055) 1px,
+      transparent 1px
+    );
+  background-size: auto, auto, 52px 52px, 52px 52px;
+  animation: tfBackgroundDrift 30s linear infinite;
+}
+
+.tf-tech-soft {
+  background-color: #f7f7f4;
+  background-image:
+    radial-gradient(
+      circle at 92% 18%,
+      rgba(255, 196, 0, 0.085),
+      transparent 320px
+    ),
+    radial-gradient(
+      circle at 8% 78%,
+      rgba(213, 161, 43, 0.06),
+      transparent 340px
+    ),
+    linear-gradient(
+      rgba(190, 137, 29, 0.045) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(190, 137, 29, 0.045) 1px,
+      transparent 1px
+    );
+  background-size: auto, auto, 58px 58px, 58px 58px;
+  animation: tfBackgroundDrift 34s linear infinite reverse;
+}
+
+.tf-tech-dark {
+  background-color: #101010;
+  background-image:
+    radial-gradient(
+      circle at 88% 12%,
+      rgba(255, 196, 0, 0.095),
+      transparent 360px
+    ),
+    radial-gradient(
+      circle at 8% 92%,
+      rgba(213, 161, 43, 0.055),
+      transparent 420px
+    ),
+    linear-gradient(
+      rgba(255, 196, 0, 0.035) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255, 196, 0, 0.035) 1px,
+      transparent 1px
+    );
+  background-size: auto, auto, 48px 48px, 48px 48px;
+  animation: tfBackgroundDrift 36s linear infinite;
+}
+
+.tf-footer-tech {
+  background-color: #0d0d0d;
+  background-image:
+    radial-gradient(
+      circle at 80% 12%,
+      rgba(255, 196, 0, 0.07),
+      transparent 320px
+    ),
+    linear-gradient(
+      rgba(255, 196, 0, 0.025) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255, 196, 0, 0.025) 1px,
+      transparent 1px
+    );
+  background-size: auto, 56px 56px, 56px 56px;
+}
+
+/* =========================================================
+   SHARED UI POLISH
+========================================================= */
+
+.tf-panel {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 24px 70px rgba(17, 17, 17, 0.055);
+}
+
+.tf-grid {
+  background-image:
+    linear-gradient(
+      rgba(213, 161, 43, 0.07) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(213, 161, 43, 0.07) 1px,
+      transparent 1px
+    );
+  background-size: 38px 38px;
+}
+
+.tf-button-glow {
+  transition:
+    transform 260ms ease,
+    box-shadow 260ms ease;
+}
+
+.tf-hover-sheen {
+  position: relative;
+  overflow: hidden;
+}
+
+.tf-hover-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-40%);
+  background: linear-gradient(
+    115deg,
+    transparent 28%,
+    rgba(255, 196, 0, 0.035) 43%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 196, 0, 0.045) 58%,
+    transparent 72%
+  );
+  transition:
+    opacity 300ms ease,
+    transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tf-link-effect {
+  position: relative;
+}
+
+.tf-link-effect::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -5px;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    var(--yellow),
+    var(--gold)
+  );
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tf-tech-card {
+  position: relative;
+  overflow: hidden;
+}
+
+/* =========================================================
+   TECHNOLOGY MARQUEE
+========================================================= */
+
+@keyframes tfTechnologyMarquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.tf-tech-marquee {
+  animation: tfTechnologyMarquee 32s linear infinite;
+  will-change: transform;
+}
+
+/* =========================================================
+   DESKTOP / POINTER HOVER
+========================================================= */
+
+@media (hover: hover) and (pointer: fine) {
+  .tf-button-glow:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 38px rgba(255, 196, 0, 0.18);
+  }
+
+  .tf-hover-sheen:hover::after {
+    opacity: 1;
+    transform: translateX(40%);
+  }
+
+  .tf-link-effect:hover::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+
+  .group\/marquee:hover .tf-tech-marquee {
+    animation-play-state: paused;
+  }
+}
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 768px) {
+  .site-container {
+    width: min(1500px, calc(100% - 32px));
+  }
+
+  body {
+    overflow-wrap: break-word;
+  }
+
+  .tf-tech-light,
+  .tf-tech-soft,
+  .tf-tech-dark {
+    animation: none;
+    background-size: auto, auto, 44px 44px, 44px 44px;
+  }
+
+  .tf-hover-sheen::after {
+    display: none;
+  }
+
+  .tf-tech-marquee {
+    animation-duration: 36s;
+  }
+}
+
+/* =========================================================
+   REDUCED MOTION
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .tf-tech-light,
+  .tf-tech-soft,
+  .tf-tech-dark,
+  .tf-tech-marquee {
+    animation: none !important;
+  }
+
+  .tf-hover-sheen::after,
+  .tf-link-effect::after,
+  .tf-button-glow {
+    transition: none !important;
+  }
+}
