@@ -1,96 +1,140 @@
-import nodemailer from "nodemailer";
 import { siteConfig } from "@/constants/site";
 
-type MailErrorShape = {
-  code?: string;
-  responseCode?: number;
-  response?: string;
-  command?: string;
-  message?: string;
+type AttachmentInput = {
+  filename: string;
+  content: Buffer | Uint8Array | string;
+  contentType?: string;
 };
 
-function smtpConfig() {
-  const host = process.env.SMTP_HOST?.trim();
-  const port = Number(process.env.SMTP_PORT || "465");
-  const user = process.env.SMTP_USER?.trim();
-  const pass = process.env.SMTP_PASSWORD;
+type SendMailInput = {
+  from?: string;
+  to: string | string[];
+  replyTo?: string;
+  subject: string;
+  text?: string;
+  html?: string;
+  attachments?: AttachmentInput[];
+};
 
-  if (!host || !user || !pass || !Number.isFinite(port)) {
-    return null;
-  }
+type ResendErrorBody = {
+  message?: string;
+  name?: string;
+  statusCode?: number;
+};
 
-  return { host, port, user, pass };
+const RESEND_ENDPOINT = "https://api.resend.com/emails";
+const DEFAULT_FROM = "Tech Fusion Website <website@send.mtechfusion.com>";
+
+function resendConfig() {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM_EMAIL?.trim() || DEFAULT_FROM;
+
+  if (!apiKey || !from) return null;
+  return { apiKey, from };
 }
 
 export function emailIsConfigured() {
-  return Boolean(smtpConfig());
+  return Boolean(resendConfig());
+}
+
+function encodeAttachment(content: AttachmentInput["content"]) {
+  if (typeof content === "string") return content;
+  return Buffer.from(content).toString("base64");
+}
+
+async function sendWithResend(input: SendMailInput) {
+  const config = resendConfig();
+  if (!config) throw new Error("EMAIL_NOT_CONFIGURED");
+
+  const response = await fetch(RESEND_ENDPOINT, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: input.from || config.from,
+      to: Array.isArray(input.to) ? input.to : [input.to],
+      reply_to: input.replyTo,
+      subject: input.subject,
+      text: input.text,
+      html: input.html,
+      attachments: input.attachments?.map((attachment) => ({
+        filename: attachment.filename,
+        content: encodeAttachment(attachment.content),
+      })),
+    }),
+  });
+
+  const body = (await response.json().catch(() => ({}))) as ResendErrorBody & {
+    id?: string;
+  };
+
+  if (!response.ok) {
+    const error = new Error(body.message || `Email API returned ${response.status}`) as Error & {
+      status?: number;
+      provider?: string;
+    };
+    error.status = response.status;
+    error.provider = body.name;
+    throw error;
+  }
+
+  return body;
 }
 
 export function createMailer() {
-  const config = smtpConfig();
-  if (!config) {
-    throw new Error("SMTP_NOT_CONFIGURED");
-  }
-
-  return nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.port === 465,
-    requireTLS: config.port === 587,
-    auth: {
-      user: config.user,
-      pass: config.pass,
-    },
-    connectionTimeout: 12000,
-    greetingTimeout: 12000,
-    socketTimeout: 25000,
-    tls: {
-      minVersion: "TLSv1.2",
-    },
-  });
+  return {
+    sendMail: sendWithResend,
+  };
 }
 
 export function senderAddress() {
-  const user = process.env.SMTP_USER?.trim() || siteConfig.contactEmail;
-  return `Tech Fusion Website <${user}>`;
+  return resendConfig()?.from || DEFAULT_FROM;
 }
 
 export function mailErrorMessage(error: unknown) {
-  const details = (typeof error === "object" && error !== null ? error : {}) as MailErrorShape;
-  const code = String(details.code || "").toUpperCase();
-  const responseCode = Number(details.responseCode || 0);
-  const message = String(details.message || "").toLowerCase();
-  const response = String(details.response || "").toLowerCase();
+  const status =
+    typeof error === "object" && error !== null && "status" in error
+      ? Number((error as { status?: number }).status || 0)
+      : 0;
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+
+  if (error instanceof Error && error.message === "EMAIL_NOT_CONFIGURED") {
+    return "Website email delivery is not configured yet. Add RESEND_API_KEY in Vercel and redeploy.";
+  }
+
+  if (status === 401 || message.includes("api key")) {
+    return "The website email API key is invalid. Reconnect Resend in Vercel and redeploy.";
+  }
 
   if (
-    code === "EAUTH" ||
-    responseCode === 535 ||
-    message.includes("authentication") ||
-    response.includes("authentication") ||
-    response.includes("incorrect password")
+    status === 403 ||
+    message.includes("domain") ||
+    message.includes("verify") ||
+    message.includes("from address")
   ) {
-    return "The website could not sign in to the Tech Fusion email account. Check SMTP_USER and the mailbox password in .env.local.";
+    return "The website sending domain is not verified yet. Verify send.mtechfusion.com in Resend, then try again.";
   }
 
-  if (code === "ETIMEDOUT" || code === "ECONNECTION" || code === "ESOCKET") {
-    return "The website could not connect to the email server. Check SMTP_HOST, SMTP_PORT and your internet connection.";
+  if (status === 422) {
+    return "The email service rejected one of the submitted fields. Please check the form and try again.";
   }
 
-  if (error instanceof Error && error.message === "SMTP_NOT_CONFIGURED") {
-    return "Website email credentials are not configured yet. Add the SMTP settings to .env.local and restart the server.";
-  }
-
-  return "The email server rejected the request. Please check the SMTP settings and try again.";
+  return "The website could not send this message right now. Please try again or contact us directly by email.";
 }
 
 export function logMailError(context: string, error: unknown) {
-  const details = (typeof error === "object" && error !== null ? error : {}) as MailErrorShape;
   console.error(`[Tech Fusion mail] ${context}`, {
-    code: details.code,
-    responseCode: details.responseCode,
-    command: details.command,
-    response: details.response,
-    message: details.message,
+    message: error instanceof Error ? error.message : String(error),
+    status:
+      typeof error === "object" && error !== null && "status" in error
+        ? (error as { status?: number }).status
+        : undefined,
+    provider:
+      typeof error === "object" && error !== null && "provider" in error
+        ? (error as { provider?: string }).provider
+        : undefined,
   });
 }
 
