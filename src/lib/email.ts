@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import { siteConfig } from "@/constants/site";
 
 type MailErrorShape = {
@@ -35,7 +36,7 @@ export function createMailer() {
 
   const secure = config.port === 465;
 
-  return nodemailer.createTransport({
+  const transportOptions: SMTPTransport.Options = {
     host: config.host,
     port: config.port,
     secure,
@@ -48,13 +49,14 @@ export function createMailer() {
     connectionTimeout: 20_000,
     greetingTimeout: 20_000,
     socketTimeout: 35_000,
-    pool: false,
     tls: {
       servername: config.host,
       minVersion: "TLSv1.2",
       rejectUnauthorized: true,
     },
-  });
+  };
+
+  return nodemailer.createTransport(transportOptions);
 }
 
 export function senderAddress() {
